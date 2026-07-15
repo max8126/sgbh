@@ -171,8 +171,17 @@
             flex-direction: column;
             gap: var(--spacing-md);
             margin-bottom: var(--spacing-md);
+            padding-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--border-color);
         }
-        .character-row:last-child { margin-bottom: 0; }
+        .character-row:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
+        /* 神兵选择行：移动端纵向堆叠，≥768px 横向排列；玉石行始终在其下方 */
+        .weapon-line {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
 
         .character-row-header {
             display: flex;
@@ -633,7 +642,7 @@
                 max-width: 768px;
                 margin: 0 auto;
             }
-            .character-row {
+            .weapon-line {
                 flex-direction: row;
                 align-items: center;
             }
@@ -698,15 +707,22 @@
     <div class="characters-container" id="characters-container"></div>
 
     <!-- 材料输入区域（由配置生成） -->
+    <!-- ① 已拥有材料（神兵材料、玉石材料各自成行） -->
     <div class="materials-input">
-        <div class="section-title">📦 全局材料设置</div>
+        <div class="section-title">🎒 已拥有材料</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">⚔️ 神兵材料</div>
         <div class="materials-grid" id="owned-materials-grid"></div>
+        <div style="font-size:13px;font-weight:600;color:#27ae60;margin-bottom:8px;">🟢 玉石材料</div>
+        <div class="materials-grid" id="owned-jade-grid"></div>
+    </div>
 
+    <!-- ② 材料售价与活动币 -->
+    <div class="materials-input">
+        <div class="section-title">🛒 材料售价与活动币</div>
         <div class="package-settings">
-            <h4>礼包设置</h4>
+            <h4>礼包单价（每包数量 / 价格）</h4>
             <div id="package-settings-container"></div>
         </div>
-
         <div class="coin-input-row">
             <label for="total-activity-coin">💰 可用活动币</label>
             <input type="number" id="total-activity-coin" min="0" value="0" placeholder="输入可用活动币数量">
@@ -852,6 +868,31 @@
     };
     const MAX_LEVEL = 50;
 
+    /* =====================================================================
+       玉石系统（秘宝之一，与神兵并列；同样按兵种加成）
+       ---------------------------------------------------------------------
+       · 玉石与神兵无直接关联，界面上每个神兵下挂 JADE_SLOTS_PER_UNIT 个玉石槽
+       · 等级 1~JADE_MAX_LEVEL（纯数字，无颜色）；所有玉石共用同一套消耗曲线
+       · 材料：璞玉 / 琢玉刀（与神兵材料不同）
+       · cost 数组为每级增量 [1→2, 2→3, ...]，均经官方计算器逐级核对
+       ===================================================================== */
+    const JADE_MAX_LEVEL = 20;      // 目前只做到 20 阶（数据已全部核实）；如需扩到更高，补齐 cost 数组即可
+    const JADE_SLOTS_PER_UNIT = 4;  // 每个神兵下的玉石槽数
+
+    // 把每级增量数组 [1→2, 2→3, ...] 转成 { 等级: 该级消耗 }（数组第 0 项 = 升到 2 级的消耗）
+    function jadeCost(incArr) {
+        const out = {};
+        incArr.forEach((v, i) => { out[i + 2] = v; });
+        return out;
+    }
+
+    const JADE_MATERIALS = [
+        { key: 'puyu',      name: '璞玉',   icon: '🟢', defaultPkgSize: 1, defaultPkgPrice: 15,
+          cost: jadeCost([12,14,16,18,20,24,28,32,36,50,60,70,80,90,100,140,180,220,260]) },
+        { key: 'zhuoyudao', name: '琢玉刀', icon: '🔪', defaultPkgSize: 1, defaultPkgPrice: 75,
+          cost: jadeCost([4,6,8,10,12,16,20,30,40,60,100,140,180,220,240,240,260,260,280]) },
+    ];
+
     // ========== 界面生成 ==========
     // 生成兵种切换标签
     function buildTabs() {
@@ -860,11 +901,13 @@
         ).join('');
     }
 
-    // 生成各兵种的单位卡片
+    // 生成各兵种的单位卡片（含每个神兵下的玉石槽）
     function buildUnitCards() {
         document.getElementById('characters-container').innerHTML = GROUPS.map((g, i) => {
-            const rows = UNITS.filter(u => u.group === g.key).map(u => `
+            const rows = UNITS.filter(u => u.group === g.key).map(u => {
+                return `
             <div class="character-row">
+                <div class="weapon-line">
                 <div class="character-row-header">
                     <div class="character-name">${u.name}</div>
                 </div>
@@ -886,7 +929,26 @@
                     <div class="status-dot"></div>
                     <span id="status-text-${u.id}">请先选择当前等级</span>
                 </div>
-            </div>`).join('');
+                </div>
+                <div style="margin-top:10px;margin-left:4px;padding-left:14px;border-left:3px solid #2ecc71;">
+                    <div style="font-size:13px;font-weight:600;color:#27ae60;margin-bottom:8px;">↳ 🟢 玉石 · ${JADE_SLOTS_PER_UNIT} 颗同级（1–${JADE_MAX_LEVEL}阶）</div>
+                    <div class="level-selectors">
+                        <div class="level-selector">
+                            <label for="jade-current-${u.id}">玉石当前</label>
+                            <div class="select-wrapper">
+                                <select id="jade-current-${u.id}" class="jade-current-select"></select>
+                            </div>
+                        </div>
+                        <div class="level-selector">
+                            <label for="jade-target-${u.id}">玉石目标</label>
+                            <div class="select-wrapper">
+                                <select id="jade-target-${u.id}" class="jade-target-select" disabled></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            }).join('');
             return `
         <div class="class-group-card${i === 0 ? ' active' : ''}" data-group="${g.key}">
             <div class="class-group-header ${g.key}">
@@ -897,15 +959,22 @@
         }).join('');
     }
 
-    // 生成材料输入区（已拥有数量 + 礼包设置）
+    // 生成材料输入区
+    //   ① 已拥有材料：神兵材料(owned-*) + 玉石材料(jade-owned-*) 合并到同一网格
+    //   ② 材料售价：仅神兵材料有礼包(pkgsize-* / pkgprice-*)
     function buildMaterialInputs() {
         document.getElementById('owned-materials-grid').innerHTML = MATERIALS.map(m => `
             <div class="material-item">
-                <label for="owned-${m.key}">已拥有${m.name}</label>
+                <label for="owned-${m.key}">已拥有${m.icon}${m.name}</label>
                 <input type="number" id="owned-${m.key}" min="0" value="0">
             </div>`).join('');
+        document.getElementById('owned-jade-grid').innerHTML = JADE_MATERIALS.map(m => `
+            <div class="material-item">
+                <label for="jade-owned-${m.key}">已拥有${m.icon}${m.name}</label>
+                <input type="number" id="jade-owned-${m.key}" min="0" value="0">
+            </div>`).join('');
 
-        document.getElementById('package-settings-container').innerHTML = MATERIALS.map(m => `
+        const pkgRow = m => `
             <div class="materials-grid">
                 <div class="material-item">
                     <label for="pkgsize-${m.key}">${m.icon} ${m.name}礼包</label>
@@ -915,7 +984,11 @@
                     <label for="pkgprice-${m.key}">礼包价格</label>
                     <input type="number" id="pkgprice-${m.key}" min="0" value="${m.defaultPkgPrice}">
                 </div>
-            </div>`).join('');
+            </div>`;
+        const subLabel = (txt, color) => `<div style="font-size:13px;font-weight:600;color:${color};margin:4px 0 8px;">${txt}</div>`;
+        document.getElementById('package-settings-container').innerHTML =
+            subLabel('⚔️ 神兵材料', 'var(--text-secondary)') + MATERIALS.map(pkgRow).join('') +
+            subLabel('🟢 玉石材料', '#27ae60') + JADE_MATERIALS.map(pkgRow).join('');
     }
 
     // ========== 初始化页面 ==========
@@ -939,6 +1012,9 @@
         // 初始化每个单位的等级选择器
         UNITS.forEach(u => initLevelSelectors(u.id));
 
+        // 初始化每个神兵的玉石选择器（4 颗同级，仅一组当前/目标）
+        UNITS.forEach(u => initJadeSelectors(u.id));
+
         document.getElementById('calculate-all').addEventListener('click', calculateTotal);
 
         // 绑定当前等级变化事件
@@ -954,6 +1030,14 @@
             select.addEventListener('change', function() {
                 const charId = this.id.split('-')[2];
                 updateStatusText(charId);
+            });
+        });
+
+        // 绑定玉石当前等级变化事件（id 格式: jade-current-{unitId}-{slot}）
+        document.querySelectorAll('.jade-current-select').forEach(select => {
+            select.addEventListener('change', function() {
+                const p = this.id.split('-');
+                updateJadeTargetOptions(p[2]);
             });
         });
     });
@@ -1039,11 +1123,42 @@
         }
     }
 
+    // 玉石选择器：初始化（当前/目标，1~JADE_MAX_LEVEL，空=不升级）
+    function initJadeSelectors(uid) {
+        const cur = document.getElementById(`jade-current-${uid}`);
+        const tgt = document.getElementById(`jade-target-${uid}`);
+        let curOpts = '<option value="">—</option>';
+        for (let lv = 1; lv <= JADE_MAX_LEVEL; lv++) curOpts += `<option value="${lv}">${lv}阶</option>`;
+        cur.innerHTML = curOpts;
+        tgt.innerHTML = '<option value="">—</option>';
+        cur.value = '';
+        tgt.value = '';
+        tgt.disabled = true;
+    }
+
+    // 玉石目标等级：仅展示 ≥ 当前等级的选项
+    function updateJadeTargetOptions(uid) {
+        const cur = document.getElementById(`jade-current-${uid}`);
+        const tgt = document.getElementById(`jade-target-${uid}`);
+        const c = parseInt(cur.value);
+        if (!c) {
+            tgt.disabled = true;
+            tgt.innerHTML = '<option value="">—</option>';
+            tgt.value = '';
+            return;
+        }
+        tgt.disabled = false;
+        let opts = '<option value="">—</option>';
+        for (let lv = c; lv <= JADE_MAX_LEVEL; lv++) opts += `<option value="${lv}">${lv}阶</option>`;
+        tgt.innerHTML = opts;
+        tgt.value = c;
+    }
+
     // ========== 计算总需求 ==========
     function calculateTotal() {
         const totalCoin = parseInt(document.getElementById('total-activity-coin').value) || 0;
 
-        // 逐单位累计各材料需求
+        // ---- 神兵：逐单位累计各材料需求 ----
         const totals = {};
         MATERIALS.forEach(m => totals[m.key] = 0);
         const charDetails = [];
@@ -1070,7 +1185,7 @@
             });
         });
 
-        // 逐材料计算缺口 / 礼包数 / 花费
+        // ---- 神兵：逐材料计算缺口 / 礼包数 / 花费 ----
         let totalCost = 0;
         const matResults = MATERIALS.map(m => {
             const owned = parseInt(document.getElementById(`owned-${m.key}`).value) || 0;
@@ -1083,6 +1198,32 @@
             totalCost += cost;
             return { m, owned, pkgSize, pkgPrice, need, shortage, packages, cost };
         });
+        // ---- 玉石：每个神兵 4 颗同级，一组当前/目标 × JADE_SLOTS_PER_UNIT ----
+        const jadeTotals = {};
+        JADE_MATERIALS.forEach(m => jadeTotals[m.key] = 0);
+        let jadeStoneCount = 0;
+        UNITS.forEach(u => {
+            const c = parseInt(document.getElementById(`jade-current-${u.id}`).value);
+            const t = parseInt(document.getElementById(`jade-target-${u.id}`).value);
+            if (!c || !t || c >= t) return;
+            jadeStoneCount += JADE_SLOTS_PER_UNIT;
+            for (let lv = c + 1; lv <= t; lv++) {
+                JADE_MATERIALS.forEach(m => { jadeTotals[m.key] += (m.cost[lv] || 0) * JADE_SLOTS_PER_UNIT; });
+            }
+        });
+        const jadeResults = JADE_MATERIALS.map(m => {
+            const owned = parseInt(document.getElementById(`jade-owned-${m.key}`).value) || 0;
+            const pkgSize = parseInt(document.getElementById(`pkgsize-${m.key}`).value) || 1;
+            const pkgPrice = parseInt(document.getElementById(`pkgprice-${m.key}`).value) || 0;
+            const need = jadeTotals[m.key];
+            const shortage = Math.max(0, need - owned);
+            const packages = Math.ceil(shortage / pkgSize);
+            const cost = packages * pkgPrice;
+            totalCost += cost;
+            return { m, owned, pkgSize, pkgPrice, need, shortage, packages, cost };
+        });
+
+        // 活动币结余（含神兵 + 玉石礼包花费）
         const coinSurplus = totalCoin - totalCost;
 
         // ---- 生成结果 HTML ----
@@ -1111,7 +1252,7 @@
                             ${r.shortage > 0 ? `<div class="mrc-action need-buy">⚠️ 需购买 <strong>${r.packages}</strong> 个礼包（${r.pkgSize}个/包）</div>` : `<div class="mrc-action no-need">✅ 材料充足，无需购买</div>`}
                         </div>`).join('');
 
-        const costRows = matResults.filter(r => r.packages > 0).map(r =>
+        const costRows = [...matResults, ...jadeResults].filter(r => r.packages > 0).map(r =>
             `<div class="cost-row"><span>${r.m.icon} ${r.m.name}礼包</span><span class="cost-amount">${r.packages}个 × ${r.pkgPrice}币 = ${formatNumber(r.cost)} 活动币</span></div>`
         ).join('');
 
@@ -1124,21 +1265,6 @@
                 <div class="result-item">
                     <h4>📦 材料需求明细</h4>
                     <div class="material-cards">${materialCards}
-                    </div>
-                </div>
-
-                <div class="result-item">
-                    <h4>💰 礼包花费</h4>
-                    <div class="cost-summary-card">
-                        ${costRows}
-                        <div class="cost-row"><span>📊 合计花费</span><span class="cost-amount">${formatNumber(totalCost)} 活动币</span></div>
-                    </div>
-                    <div style="margin-top:12px;padding:12px;background:#f8f9fa;border-radius:8px;text-align:center;">
-                        <span style="font-size:14px;color:#555;">可用 <strong style="font-size:1.2rem;color:#2c3e50;">${formatNumber(totalCoin)}</strong> 活动币 →
-                        ${coinSurplus >= 0
-                            ? `<span style="color:#27ae60;font-weight:700;font-size:1.1rem;">剩余 ${formatNumber(coinSurplus)}</span> ✅`
-                            : `<span style="color:#e74c3c;font-weight:700;font-size:1.1rem;">不足 ${formatNumber(Math.abs(coinSurplus))}</span> ❌`}
-                        </span>
                     </div>
                 </div>
             `;
@@ -1164,6 +1290,57 @@
                     </div>
                 `;
         }
+
+        // ---- 玉石结果 ----
+        if (jadeStoneCount > 0) {
+            const jadeCards = jadeResults.map(r => `
+                        <div class="material-result-card ${r.shortage > 0 ? 'shortage' : 'enough'}">
+                            <div class="mrc-header">
+                                <span class="mrc-icon">${r.m.icon}</span>
+                                <span class="mrc-name">${r.m.name}</span>
+                            </div>
+                            <div class="mrc-grid">
+                                <div class="mrc-stat">
+                                    <div class="mrc-val">${formatNumber(r.need)}</div>
+                                    <div class="mrc-label">需要</div>
+                                </div>
+                                <div class="mrc-stat">
+                                    <div class="mrc-val">${formatNumber(r.owned)}</div>
+                                    <div class="mrc-label">拥有</div>
+                                </div>
+                                <div class="mrc-stat">
+                                    <div class="mrc-val ${r.shortage > 0 ? 'highlight-red' : 'highlight-green'}">${r.shortage > 0 ? formatNumber(r.shortage) : '✓'}</div>
+                                    <div class="mrc-label">缺口</div>
+                                </div>
+                            </div>
+                            ${r.shortage > 0 ? `<div class="mrc-action need-buy">⚠️ 需购买 <strong>${r.packages}</strong> 个礼包（${r.pkgSize}个/包）</div>` : `<div class="mrc-action no-need">✅ 材料充足，无需购买</div>`}
+                        </div>`).join('');
+            resultHTML += `
+                    <div class="result-item">
+                        <h4>🟢 玉石材料需求（共 ${jadeStoneCount} 颗）</h4>
+                        <div class="material-cards">${jadeCards}
+                        </div>
+                    </div>
+                `;
+        }
+
+        // ---- 礼包花费与活动币结余（最终结果，置于最底部）----
+        resultHTML += `
+                <div class="result-item">
+                    <h4>💰 礼包花费合计（神兵 + 玉石）</h4>
+                    <div class="cost-summary-card">
+                        ${costRows}
+                        <div class="cost-row"><span>📊 合计花费</span><span class="cost-amount">${formatNumber(totalCost)} 活动币</span></div>
+                    </div>
+                    <div style="margin-top:12px;padding:12px;background:#f8f9fa;border-radius:8px;text-align:center;">
+                        <span style="font-size:14px;color:#555;">可用 <strong style="font-size:1.2rem;color:#2c3e50;">${formatNumber(totalCoin)}</strong> 活动币 →
+                        ${coinSurplus >= 0
+                            ? `<span style="color:#27ae60;font-weight:700;font-size:1.1rem;">剩余 ${formatNumber(coinSurplus)}</span> ✅`
+                            : `<span style="color:#e74c3c;font-weight:700;font-size:1.1rem;">不足 ${formatNumber(Math.abs(coinSurplus))}</span> ❌`}
+                        </span>
+                    </div>
+                </div>
+            `;
 
         document.getElementById('total-result').innerHTML = resultHTML;
 
