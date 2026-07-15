@@ -448,6 +448,12 @@
             background-color: #3a5a80;
             transform: translateY(2px);
         }
+        #reset-all {
+            flex: 0 0 auto;
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+        #reset-all:active { transform: translateY(2px); }
         /* 结果区域 */
         .results-section {
             background-color: var(--bg-primary);
@@ -742,6 +748,7 @@
 
 <!-- 底部按钮组 -->
 <div class="button-group">
+    <button id="reset-all" type="button">🗑️ 重置</button>
     <button id="calculate-all">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
@@ -1033,13 +1040,20 @@
             });
         });
 
-        // 绑定玉石当前等级变化事件（id 格式: jade-current-{unitId}-{slot}）
+        // 绑定玉石当前等级变化事件（id 格式: jade-current-{unitId}）
         document.querySelectorAll('.jade-current-select').forEach(select => {
             select.addEventListener('change', function() {
                 const p = this.id.split('-');
                 updateJadeTargetOptions(p[2]);
             });
         });
+
+        // ---- 本地存储：恢复上次输入 → 变化时自动保存 → 重置按钮 ----
+        restoreState();
+        const container = document.querySelector('.container');
+        container.addEventListener('change', saveState);
+        container.addEventListener('input', saveState);
+        document.getElementById('reset-all').addEventListener('click', resetState);
     });
 
     // 初始化等级选择器
@@ -1354,6 +1368,63 @@
     // 辅助函数：格式化数字（千分位）
     function formatNumber(num) {
         return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // ========== 本地存储（localStorage）：刷新后保留用户输入 ==========
+    const STORAGE_KEY = 'sgbh-calc-state';
+
+    // 收集容器内所有带 id 的 select / number 输入
+    function persistFields() {
+        return Array.from(document.querySelectorAll('.container select[id], .container input[id]'));
+    }
+
+    function saveState() {
+        const state = {};
+        persistFields().forEach(el => { state[el.id] = el.value; });
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* 隐私模式等，忽略 */ }
+    }
+
+    function restoreState() {
+        let state = null;
+        try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { state = null; }
+        if (!state) return;
+
+        // 1) 先恢复神兵「当前等级」并据此重建「目标等级」选项
+        UNITS.forEach(u => {
+            const cur = state[`current-level-${u.id}`];
+            if (cur) {
+                document.getElementById(`current-level-${u.id}`).value = cur;
+                updateTargetLevelOptions(u.id);
+            }
+        });
+        // 2) 再恢复神兵「目标等级」并刷新状态文本
+        UNITS.forEach(u => {
+            const tgt = state[`target-level-${u.id}`];
+            if (tgt) document.getElementById(`target-level-${u.id}`).value = tgt;
+            updateStatusText(u.id);
+        });
+        // 3) 玉石「当前」→重建「目标」选项→恢复「目标」
+        UNITS.forEach(u => {
+            const jc = state[`jade-current-${u.id}`];
+            if (jc) {
+                document.getElementById(`jade-current-${u.id}`).value = jc;
+                updateJadeTargetOptions(u.id);
+            }
+        });
+        UNITS.forEach(u => {
+            const jt = state[`jade-target-${u.id}`];
+            if (jt) document.getElementById(`jade-target-${u.id}`).value = jt;
+        });
+        // 4) 其余数字输入（已拥有 / 礼包 / 活动币）
+        persistFields().forEach(el => {
+            if (el.tagName === 'INPUT' && state[el.id] !== undefined) el.value = state[el.id];
+        });
+    }
+
+    function resetState() {
+        if (!confirm('确定要清空所有输入吗？')) return;
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* 忽略 */ }
+        location.reload();
     }
 </script>
     <!-- 底部导航栏 -->
