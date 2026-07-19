@@ -740,7 +740,7 @@
         <div class="result-summary">
             <div class="section-title">📊 计算结果</div>
             <div id="total-result">
-                <p style="color: var(--text-secondary); text-align: center;">请点击"汇总计算"查看结果</p>
+                <p style="color: var(--text-secondary); text-align: center;">请选择升级目标，结果将自动显示</p>
             </div>
         </div>
     </div>
@@ -753,7 +753,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
         </svg>
-        汇总计算
+        查看结果
     </button>
 </div>
 
@@ -1022,7 +1022,11 @@
         // 初始化每个神兵的玉石选择器（4 颗同级，仅一组当前/目标）
         UNITS.forEach(u => initJadeSelectors(u.id));
 
-        document.getElementById('calculate-all').addEventListener('click', calculateTotal);
+        // 结果已实时计算；此按钮改为「滚动到结果区」（并刷新一次以确保最新）
+        document.getElementById('calculate-all').addEventListener('click', () => {
+            calculateTotal();
+            document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
 
         // 绑定当前等级变化事件
         document.querySelectorAll('.current-level-select').forEach(select => {
@@ -1051,9 +1055,14 @@
         // ---- 本地存储：恢复上次输入 → 变化时自动保存 → 重置按钮 ----
         restoreState();
         const container = document.querySelector('.container');
-        container.addEventListener('change', saveState);
-        container.addEventListener('input', saveState);
+        // 任一输入变化 → 保存 + 实时重新计算
+        const onFieldChange = () => { saveState(); calculateTotal(); };
+        container.addEventListener('change', onFieldChange);
+        container.addEventListener('input', onFieldChange);
         document.getElementById('reset-all').addEventListener('click', resetState);
+
+        // 载入时先计算一次（基于已恢复的输入）
+        calculateTotal();
     });
 
     // 初始化等级选择器
@@ -1225,6 +1234,13 @@
                 JADE_MATERIALS.forEach(m => { jadeTotals[m.key] += (m.cost[lv] || 0) * JADE_SLOTS_PER_UNIT; });
             }
         });
+        // 没有任何升级目标（神兵 / 玉石）时，显示提示而非全零结果
+        if (charDetails.length === 0 && jadeStoneCount === 0) {
+            document.getElementById('total-result').innerHTML =
+                '<p style="color: var(--text-secondary); text-align: center;">请选择升级目标，结果将自动显示</p>';
+            return;
+        }
+
         const jadeResults = JADE_MATERIALS.map(m => {
             const owned = parseInt(document.getElementById(`jade-owned-${m.key}`).value) || 0;
             const pkgSize = parseInt(document.getElementById(`pkgsize-${m.key}`).value) || 1;
@@ -1357,12 +1373,6 @@
             `;
 
         document.getElementById('total-result').innerHTML = resultHTML;
-
-        window.scrollTo({
-            top: document.body.scrollHeight,
-            left: 0,
-            behavior: 'auto'
-        });
     }
 
     // 辅助函数：格式化数字（千分位）
