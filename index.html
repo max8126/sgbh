@@ -204,14 +204,14 @@
             display: flex;
             gap: var(--spacing-md);
             width: 100%;
+            justify-content: flex-start;
             overflow: hidden;
         }
 
         .level-selector {
-            flex: 1;
+            flex: 0 1 180px;
             min-width: 0 !important;
-            max-width: calc(50% - var(--spacing-md)/2) !important;
-            width: calc(50% - var(--spacing-md)/2) !important;
+            max-width: 180px;
             overflow: hidden;
             position: relative;
         }
@@ -304,22 +304,6 @@
             .select-wrapper select option {
                 width: 200px !important;
             }
-        }
-
-        .char-status {
-            font-size: var(--font-size-xs);
-            color: var(--text-secondary);
-            margin-top: var(--spacing-sm);
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-xs);
-        }
-
-        .status-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background-color: var(--text-tertiary);
         }
 
         /* 材料输入区域 */
@@ -682,10 +666,6 @@
                 flex-direction: row;
                 align-items: center;
             }
-            .level-selector {
-                max-width: calc(50% - var(--spacing-md)/2) !important;
-                width: calc(50% - var(--spacing-md)/2) !important;
-            }
         }
         /* ========== 桌面两栏：输入区滚动，结果面板常驻（sticky） ========== */
         @media (min-width: 900px) {
@@ -990,10 +970,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="char-status" id="char-status-${u.id}">
-                    <div class="status-dot"></div>
-                    <span id="status-text-${u.id}">请先选择当前等级</span>
-                </div>
                 </div>
                 <div style="margin-top:10px;margin-left:4px;padding-left:14px;border-left:3px solid #2ecc71;">
                     <div style="font-size:13px;font-weight:600;color:#27ae60;margin-bottom:8px;">↳ 🟢 玉石 · ${JADE_SLOTS_PER_UNIT} 颗同级（1–${JADE_MAX_LEVEL}阶）</div>
@@ -1085,19 +1061,11 @@
             document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
 
-        // 绑定当前等级变化事件
+        // 绑定当前等级变化事件：重建目标等级可选项（结果由容器监听实时重算）
         document.querySelectorAll('.current-level-select').forEach(select => {
             select.addEventListener('change', function() {
                 const charId = this.id.split('-')[2];
                 updateTargetLevelOptions(charId);
-                updateStatusText(charId);
-            });
-        });
-
-        document.querySelectorAll('.target-level-select').forEach(select => {
-            select.addEventListener('change', function() {
-                const charId = this.id.split('-')[2];
-                updateStatusText(charId);
             });
         });
 
@@ -1147,7 +1115,6 @@
         currentSelect.value = '';
         targetSelect.value = '';
         targetSelect.disabled = true;
-        updateStatusText(charId);
     }
 
     // 目标等级仅展示可选选项（≥当前等级）
@@ -1183,24 +1150,6 @@
         }
 
         targetSelect.value = currentLevel;
-    }
-
-    // 更新状态文本
-    function updateStatusText(charId) {
-        const statusText = document.getElementById(`status-text-${charId}`);
-        const currentSelect = document.getElementById(`current-level-${charId}`);
-        const targetSelect = document.getElementById(`target-level-${charId}`);
-        const currentLevel = parseInt(currentSelect.value);
-        const targetLevel = parseInt(targetSelect.value);
-        const statusDot = document.getElementById(`char-status-${charId}`).querySelector('.status-dot');
-
-        if (!currentLevel) {
-            statusText.textContent = "请先选择当前等级";
-            statusDot.style.backgroundColor = "var(--warning-color)";
-        } else {
-            statusText.textContent = `${levelNameMap[currentLevel]} → ${levelNameMap[targetLevel]}`;
-            statusDot.style.backgroundColor = "var(--secondary-color)";
-        }
     }
 
     // 玉石选择器：初始化（当前/目标，1~JADE_MAX_LEVEL，空=不升级）
@@ -1477,11 +1426,10 @@
                 updateTargetLevelOptions(u.id);
             }
         });
-        // 2) 再恢复神兵「目标等级」并刷新状态文本
+        // 2) 再恢复神兵「目标等级」
         UNITS.forEach(u => {
             const tgt = state[`target-level-${u.id}`];
             if (tgt) document.getElementById(`target-level-${u.id}`).value = tgt;
-            updateStatusText(u.id);
         });
         // 3) 玉石「当前」→重建「目标」选项→恢复「目标」
         UNITS.forEach(u => {
