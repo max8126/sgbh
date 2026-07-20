@@ -57,6 +57,10 @@
             padding: var(--spacing-md);
         }
 
+        /* 两栏布局（移动端为单列堆叠，桌面端左输入右结果） */
+        .layout { display: block; }
+        .inputs-col, .results-col { min-width: 0; }
+
         /* 顶部标题栏 */
         .header {
             background-color: var(--bg-primary);
@@ -413,47 +417,73 @@
             color: var(--text-primary);
         }
 
-        /* 按钮组 */
-        .button-group {
+        /* 实时汇总条（移动端固定条；桌面端隐藏） */
+        .totals-bar {
             position: fixed;
             bottom: 56px;
             left: 0;
             right: 0;
             background-color: var(--bg-primary);
-            padding: var(--spacing-md);
+            padding: 10px var(--spacing-md);
             display: flex;
-            gap: var(--spacing-md);
+            gap: var(--spacing-sm);
             box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
             z-index: 999;
         }
-        .button-group button {
+        .totals-main {
             flex: 1;
-            padding: 14px;
+            min-width: 0;
+            padding: 12px 14px;
             border: none;
             border-radius: var(--radius-md);
+            background-color: #eef2f7;
+            color: var(--text-primary);
             font-size: var(--font-size-md);
             font-weight: 600;
+            line-height: 1.35;
             cursor: pointer;
-            transition: all 0.3s;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: var(--spacing-sm);
+            text-align: center;
+            transition: background-color 0.2s;
         }
-        #calculate-all {
-            background-color: #4a6fa5;
-            color: white;
-        }
-        #calculate-all:active {
-            background-color: #3a5a80;
-            transform: translateY(2px);
-        }
-        #reset-all {
+        .totals-main:active { background-color: #e2e8f0; }
+        .totals-reset {
             flex: 0 0 auto;
+            padding: 12px 14px;
+            border: none;
+            border-radius: var(--radius-md);
             background-color: var(--bg-tertiary);
             color: var(--text-secondary);
+            font-size: var(--font-size-md);
+            cursor: pointer;
         }
-        #reset-all:active { transform: translateY(2px); }
+        .totals-reset:active { transform: translateY(2px); }
+        .totals-cost { color: var(--text-secondary); }
+        .totals-ok { color: #27ae60; font-weight: 700; }
+        .totals-bad { color: #e74c3c; font-weight: 700; }
+
+        /* 结果标题栏（含桌面端重置按钮） */
+        .result-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--spacing-sm);
+        }
+        .result-reset {
+            display: none; /* 移动端隐藏，改用汇总条里的重置 */
+            flex: 0 0 auto;
+            padding: 6px 12px;
+            border: none;
+            border-radius: var(--radius-sm);
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .result-reset:active { transform: translateY(1px); }
         /* 结果区域 */
         .results-section {
             background-color: var(--bg-primary);
@@ -657,6 +687,27 @@
                 width: calc(50% - var(--spacing-md)/2) !important;
             }
         }
+        /* ========== 桌面两栏：输入区滚动，结果面板常驻（sticky） ========== */
+        @media (min-width: 900px) {
+            .container { max-width: 1080px; }
+            .layout {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+                gap: var(--spacing-md);
+                align-items: stretch;
+            }
+            .results-section {
+                position: sticky;
+                top: 12px;
+                max-height: calc(100vh - 24px - 56px);
+                overflow-y: auto;
+                margin-top: 0;
+                margin-bottom: 0;
+            }
+            .totals-bar { display: none; }
+            .result-reset { display: inline-flex; align-items: center; }
+            body { padding-bottom: 72px; } /* 桌面端仅需避开底部导航 */
+        }
         /* ========== 底部导航栏 ========== */
         .bottom-nav {
             position: fixed;
@@ -706,55 +757,62 @@
         <div class="subtitle">神兵进阶规划</div>
     </div>
 
-    <!-- 兵种切换标签（由配置生成） -->
-    <div class="class-tabs" id="class-tabs"></div>
+    <div class="layout">
+        <!-- 左栏：输入区 -->
+        <div class="inputs-col">
+            <!-- 兵种切换标签（由配置生成） -->
+            <div class="class-tabs" id="class-tabs"></div>
 
-    <!-- 神兵输入区域（由配置生成） -->
-    <div class="characters-container" id="characters-container"></div>
+            <!-- 神兵输入区域（由配置生成） -->
+            <div class="characters-container" id="characters-container"></div>
 
-    <!-- 材料输入区域（由配置生成） -->
-    <!-- ① 已拥有材料（神兵材料、玉石材料各自成行） -->
-    <div class="materials-input">
-        <div class="section-title">🎒 已拥有材料</div>
-        <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">⚔️ 神兵材料</div>
-        <div class="materials-grid" id="owned-materials-grid"></div>
-        <div style="font-size:13px;font-weight:600;color:#27ae60;margin-bottom:8px;">🟢 玉石材料</div>
-        <div class="materials-grid" id="owned-jade-grid"></div>
-    </div>
+            <!-- 材料输入区域（由配置生成） -->
+            <!-- ① 已拥有材料（神兵材料、玉石材料各自成行） -->
+            <div class="materials-input">
+                <div class="section-title">🎒 已拥有材料</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">⚔️ 神兵材料</div>
+                <div class="materials-grid" id="owned-materials-grid"></div>
+                <div style="font-size:13px;font-weight:600;color:#27ae60;margin-bottom:8px;">🟢 玉石材料</div>
+                <div class="materials-grid" id="owned-jade-grid"></div>
+            </div>
 
-    <!-- ② 材料售价与活动币 -->
-    <div class="materials-input">
-        <div class="section-title">🛒 材料售价与活动币</div>
-        <div class="package-settings">
-            <h4>礼包单价（每包数量 / 价格）</h4>
-            <div id="package-settings-container"></div>
+            <!-- ② 材料售价与活动币 -->
+            <div class="materials-input">
+                <div class="section-title">🛒 材料售价与活动币</div>
+                <div class="package-settings">
+                    <h4>礼包单价（每包数量 / 价格）</h4>
+                    <div id="package-settings-container"></div>
+                </div>
+                <div class="coin-input-row">
+                    <label for="total-activity-coin">💰 可用活动币</label>
+                    <input type="number" id="total-activity-coin" min="0" value="0" placeholder="输入可用活动币数量">
+                </div>
+            </div>
         </div>
-        <div class="coin-input-row">
-            <label for="total-activity-coin">💰 可用活动币</label>
-            <input type="number" id="total-activity-coin" min="0" value="0" placeholder="输入可用活动币数量">
-        </div>
-    </div>
 
-    <!-- 结果区域：移除淡入动画类 -->
-    <div class="results-section" id="results-section">
-        <div class="result-summary">
-            <div class="section-title">📊 计算结果</div>
-            <div id="total-result">
-                <p style="color: var(--text-secondary); text-align: center;">请选择升级目标，结果将自动显示</p>
+        <!-- 右栏：结果区（桌面端常驻可见，移动端在底部） -->
+        <div class="results-col">
+            <div class="results-section" id="results-section">
+                <div class="result-summary">
+                    <div class="section-title result-head">
+                        <span>📊 计算结果</span>
+                        <button type="button" class="js-reset result-reset">🗑️ 重置</button>
+                    </div>
+                    <div id="total-result">
+                        <p style="color: var(--text-secondary); text-align: center;">请选择升级目标，结果将自动显示</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- 底部按钮组 -->
-<div class="button-group">
-    <button id="reset-all" type="button">🗑️ 重置</button>
-    <button id="calculate-all">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-        </svg>
-        查看结果
+<!-- 实时汇总条（移动端固定在导航上方；桌面端隐藏，结果面板常驻可见） -->
+<div class="totals-bar" id="totals-bar">
+    <button type="button" class="totals-main" id="totals-jump">
+        <span id="totals-summary">请选择升级目标，结果将自动显示</span>
     </button>
+    <button type="button" class="js-reset totals-reset" title="重置">🗑️</button>
 </div>
 
 <script>
@@ -1022,9 +1080,8 @@
         // 初始化每个神兵的玉石选择器（4 颗同级，仅一组当前/目标）
         UNITS.forEach(u => initJadeSelectors(u.id));
 
-        // 结果已实时计算；此按钮改为「滚动到结果区」（并刷新一次以确保最新）
-        document.getElementById('calculate-all').addEventListener('click', () => {
-            calculateTotal();
+        // 结果实时计算；点击汇总条滚动到完整明细（移动端）
+        document.getElementById('totals-jump').addEventListener('click', () => {
             document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
 
@@ -1059,7 +1116,7 @@
         const onFieldChange = () => { saveState(); calculateTotal(); };
         container.addEventListener('change', onFieldChange);
         container.addEventListener('input', onFieldChange);
-        document.getElementById('reset-all').addEventListener('click', resetState);
+        document.querySelectorAll('.js-reset').forEach(b => b.addEventListener('click', resetState));
 
         // 载入时先计算一次（基于已恢复的输入）
         calculateTotal();
@@ -1238,6 +1295,7 @@
         if (charDetails.length === 0 && jadeStoneCount === 0) {
             document.getElementById('total-result').innerHTML =
                 '<p style="color: var(--text-secondary); text-align: center;">请选择升级目标，结果将自动显示</p>';
+            setTotalsBar('请选择升级目标，结果将自动显示');
             return;
         }
 
@@ -1373,6 +1431,18 @@
             `;
 
         document.getElementById('total-result').innerHTML = resultHTML;
+
+        // ---- 实时汇总条：花费合计 + 结余（移动端常驻可见） ----
+        const surplusHTML = coinSurplus >= 0
+            ? `<span class="totals-ok">剩余 ${formatNumber(coinSurplus)} ✅</span>`
+            : `<span class="totals-bad">不足 ${formatNumber(Math.abs(coinSurplus))} ❌</span>`;
+        setTotalsBar(`<span class="totals-cost">💰 花费 ${formatNumber(totalCost)}</span>　${surplusHTML}`);
+    }
+
+    // 更新底部实时汇总条文字
+    function setTotalsBar(html) {
+        const el = document.getElementById('totals-summary');
+        if (el) el.innerHTML = html;
     }
 
     // 辅助函数：格式化数字（千分位）
