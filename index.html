@@ -468,6 +468,48 @@
             cursor: pointer;
         }
         .result-reset:active { transform: translateY(1px); }
+
+        /* 自动扣除提示条 */
+        .autodeduct-note {
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--spacing-sm);
+            background: #fff8e1;
+            border: 1px solid #ffe0a3;
+            color: #8a6d3b;
+            border-radius: var(--radius-md);
+            padding: 10px 12px;
+            margin-bottom: var(--spacing-md);
+            font-size: var(--font-size-sm);
+            box-shadow: var(--card-shadow);
+        }
+        .autodeduct-note .adn-msg { flex: 1; min-width: 0; line-height: 1.4; }
+        .autodeduct-note .adn-actions { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; }
+        .autodeduct-note button {
+            border: none; border-radius: var(--radius-sm); cursor: pointer;
+            font-size: var(--font-size-xs); font-weight: 600; padding: 6px 10px;
+        }
+        .autodeduct-note #adn-undo { background: #4a6fa5; color: #fff; }
+        .autodeduct-note #adn-close { background: transparent; color: #8a6d3b; padding: 6px 8px; font-size: 14px; }
+
+        /* 自动扣除开关 */
+        .auto-deduct-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: var(--spacing-md);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+        }
+        .auto-deduct-row input[type="checkbox"] {
+            width: 18px; height: 18px; margin-top: 2px; flex: 0 0 auto;
+            accent-color: #4a6fa5; cursor: pointer;
+        }
+        .auto-deduct-row .adt-text { display: flex; flex-direction: column; gap: 2px; }
+        .auto-deduct-row .adt-title { font-size: var(--font-size-sm); font-weight: 600; color: var(--text-primary); }
+        .auto-deduct-row .adt-hint { font-size: var(--font-size-xs); color: var(--text-secondary); line-height: 1.4; }
         /* 结果区域 */
         .results-section {
             background-color: var(--bg-primary);
@@ -737,6 +779,9 @@
         <div class="subtitle">神兵进阶规划</div>
     </div>
 
+    <!-- 自动扣除提示条（升级后弹出，可撤销） -->
+    <div id="autodeduct-note" class="autodeduct-note" style="display:none;"></div>
+
     <div class="layout">
         <!-- 左栏：输入区 -->
         <div class="inputs-col">
@@ -750,6 +795,13 @@
             <!-- ① 已拥有材料（神兵材料、玉石材料各自成行） -->
             <div class="materials-input">
                 <div class="section-title">🎒 已拥有材料</div>
+                <label class="auto-deduct-row" for="auto-deduct-toggle">
+                    <input type="checkbox" id="auto-deduct-toggle" checked>
+                    <span class="adt-text">
+                        <span class="adt-title">⚙️ 升级时自动扣除库存</span>
+                        <span class="adt-hint">开启后，调高「当前等级」会自动从下方库存中扣掉消耗的材料（可撤销）</span>
+                    </span>
+                </label>
                 <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">⚔️ 神兵材料</div>
                 <div class="materials-grid" id="owned-materials-grid"></div>
                 <div style="font-size:13px;font-weight:600;color:#27ae60;margin-bottom:8px;">🟢 玉石材料</div>
@@ -1065,20 +1117,29 @@
         document.querySelectorAll('.current-level-select').forEach(select => {
             select.addEventListener('change', function() {
                 const charId = this.id.split('-')[2];
+                const oldLv = prevLevel[this.id] || 0;
+                const newLv = parseInt(this.value) || 0;
                 updateTargetLevelOptions(charId);
+                if (autoDeductEnabled() && oldLv > 0 && newLv > oldLv) autoDeductWeapon(charId, oldLv, newLv);
+                prevLevel[this.id] = newLv;
             });
         });
 
         // 绑定玉石当前等级变化事件（id 格式: jade-current-{unitId}）
         document.querySelectorAll('.jade-current-select').forEach(select => {
             select.addEventListener('change', function() {
-                const p = this.id.split('-');
-                updateJadeTargetOptions(p[2]);
+                const uid = this.id.split('-')[2];
+                const oldLv = prevLevel[this.id] || 0;
+                const newLv = parseInt(this.value) || 0;
+                updateJadeTargetOptions(uid);
+                if (autoDeductEnabled() && oldLv > 0 && newLv > oldLv) autoDeductJade(uid, oldLv, newLv);
+                prevLevel[this.id] = newLv;
             });
         });
 
         // ---- 本地存储：恢复上次输入 → 变化时自动保存 → 重置按钮 ----
         restoreState();
+        initPrevLevels(); // 以恢复后的当前等级为基准，之后升级才触发自动扣除
         const container = document.querySelector('.container');
         // 任一输入变化 → 保存 + 实时重新计算
         const onFieldChange = () => { saveState(); calculateTotal(); };
@@ -1134,6 +1195,7 @@
             return;
         }
 
+        const prevTarget = parseInt(targetSelect.value);
         targetSelect.disabled = false;
         targetSelect.innerHTML = '';
 
@@ -1149,7 +1211,8 @@
             targetSelect.appendChild(option);
         }
 
-        targetSelect.value = currentLevel;
+        // 保留原目标（若仍 ≥ 新的当前等级）；否则留空待选，不再强制回落到当前等级
+        targetSelect.value = (!isNaN(prevTarget) && prevTarget >= currentLevel) ? prevTarget : '';
     }
 
     // 玉石选择器：初始化（当前/目标，1~JADE_MAX_LEVEL，空=不升级）
@@ -1176,11 +1239,116 @@
             tgt.value = '';
             return;
         }
+        const prevT = parseInt(tgt.value);
         tgt.disabled = false;
         let opts = '<option value="">—</option>';
         for (let lv = c; lv <= JADE_MAX_LEVEL; lv++) opts += `<option value="${lv}">${lv}阶</option>`;
         tgt.innerHTML = opts;
-        tgt.value = c;
+        // 保留原玉石目标（若仍 ≥ 新的当前等级）；否则留空
+        tgt.value = (!isNaN(prevT) && prevT >= c) ? prevT : '';
+    }
+
+    // ========== 升级时自动扣除已拥有材料 ==========
+    const prevLevel = {};       // 记录各「当前等级」选择器的上一个数值
+    let lastAutoDeduct = null;  // 最近一次自动扣除快照（供撤销）
+
+    // 记录所有「当前等级」（神兵 + 玉石）的初始数值，作为后续增减的基准
+    function initPrevLevels() {
+        document.querySelectorAll('.current-level-select, .jade-current-select').forEach(sel => {
+            prevLevel[sel.id] = parseInt(sel.value) || 0;
+        });
+    }
+
+    function autoDeductEnabled() {
+        const t = document.getElementById('auto-deduct-toggle');
+        return t ? t.checked : false;
+    }
+
+    // 神兵升级：扣除 fromLv+1..toLv 消耗的材料
+    function autoDeductWeapon(charId, fromLv, toLv) {
+        const consumed = {};
+        MATERIALS.forEach(m => {
+            let s = 0;
+            for (let lv = fromLv + 1; lv <= toLv; lv++) s += (m.cost[lv] || 0);
+            consumed[m.key] = s;
+        });
+        const unit = UNITS.find(u => String(u.id) === String(charId));
+        applyAutoDeduct(consumed, MATERIALS, 'owned-', {
+            levelId: `current-level-${charId}`, fromLv,
+            label: `${unit ? unit.name : ''} ${levelNameMap[fromLv]}→${levelNameMap[toLv]}`
+        });
+    }
+
+    // 玉石升级：扣除 (fromLv+1..toLv) × 每神兵颗数 消耗的材料
+    function autoDeductJade(uid, fromLv, toLv) {
+        const consumed = {};
+        JADE_MATERIALS.forEach(m => {
+            let s = 0;
+            for (let lv = fromLv + 1; lv <= toLv; lv++) s += (m.cost[lv] || 0) * JADE_SLOTS_PER_UNIT;
+            consumed[m.key] = s;
+        });
+        const unit = UNITS.find(u => String(u.id) === String(uid));
+        applyAutoDeduct(consumed, JADE_MATERIALS, 'jade-owned-', {
+            levelId: `jade-current-${uid}`, fromLv,
+            label: `${unit ? unit.name : ''} 玉石 ${fromLv}阶→${toLv}阶`
+        });
+    }
+
+    // 从「已拥有」输入框扣除消耗量（下限 0），并弹出可撤销提示
+    function applyAutoDeduct(consumed, matList, ownedPrefix, ctx) {
+        const snapshot = {};
+        const parts = [];
+        matList.forEach(m => {
+            const amt = consumed[m.key] || 0;
+            if (amt <= 0) return;
+            const el = document.getElementById(ownedPrefix + m.key);
+            if (!el) return;
+            const before = parseInt(el.value) || 0;
+            const after = Math.max(0, before - amt);
+            snapshot[el.id] = el.value;
+            el.value = after;
+            parts.push(`${m.icon}${m.name} -${formatNumber(before - after)}`);
+        });
+        if (!parts.length) return;
+        lastAutoDeduct = { snapshot, levelId: ctx.levelId, fromLv: ctx.fromLv };
+        showDeductNote(`升级 ${ctx.label}，已自动扣除库存：${parts.join('　')}`);
+    }
+
+    function showDeductNote(msg) {
+        const note = document.getElementById('autodeduct-note');
+        if (!note) return;
+        note.innerHTML =
+            `<span class="adn-msg">${msg}</span>` +
+            `<span class="adn-actions"><button type="button" id="adn-undo">撤销</button>` +
+            `<button type="button" id="adn-close" aria-label="关闭">✕</button></span>`;
+        note.style.display = 'flex';
+        document.getElementById('adn-undo').onclick = undoAutoDeduct;
+        document.getElementById('adn-close').onclick = hideDeductNote;
+    }
+
+    function hideDeductNote() {
+        const note = document.getElementById('autodeduct-note');
+        if (note) { note.style.display = 'none'; note.innerHTML = ''; }
+    }
+
+    // 撤销：还原被扣的库存 + 把当前等级退回升级前
+    function undoAutoDeduct() {
+        if (!lastAutoDeduct) { hideDeductNote(); return; }
+        Object.entries(lastAutoDeduct.snapshot).forEach(([id, val]) => {
+            const el = document.getElementById(id); if (el) el.value = val;
+        });
+        const lvEl = document.getElementById(lastAutoDeduct.levelId);
+        if (lvEl) {
+            lvEl.value = String(lastAutoDeduct.fromLv);
+            prevLevel[lvEl.id] = lastAutoDeduct.fromLv;
+            const uid = lastAutoDeduct.levelId.split('-')[2];
+            if (lastAutoDeduct.levelId.indexOf('jade-current-') === 0) updateJadeTargetOptions(uid);
+            else updateTargetLevelOptions(uid);
+        }
+        lastAutoDeduct = null;
+        hideDeductNote();
+        saveState();
+        calculateTotal();
     }
 
     // ========== 计算总需求 ==========
@@ -1409,7 +1577,7 @@
 
     function saveState() {
         const state = {};
-        persistFields().forEach(el => { state[el.id] = el.value; });
+        persistFields().forEach(el => { state[el.id] = (el.type === 'checkbox') ? el.checked : el.value; });
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* 隐私模式等，忽略 */ }
     }
 
@@ -1443,9 +1611,11 @@
             const jt = state[`jade-target-${u.id}`];
             if (jt) document.getElementById(`jade-target-${u.id}`).value = jt;
         });
-        // 4) 其余数字输入（已拥有 / 礼包 / 活动币）
+        // 4) 其余输入（已拥有 / 礼包 / 活动币 / 复选框开关）
         persistFields().forEach(el => {
-            if (el.tagName === 'INPUT' && state[el.id] !== undefined) el.value = state[el.id];
+            if (el.tagName !== 'INPUT' || state[el.id] === undefined) return;
+            if (el.type === 'checkbox') el.checked = !!state[el.id];
+            else el.value = state[el.id];
         });
     }
 
