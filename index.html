@@ -349,6 +349,24 @@
         .ur-tag-weapon { color: var(--text-secondary); }
         .ur-tag-jade { color: #27ae60; }
 
+        /* 已拥有材料：神兵材料 / 玉石材料 两列并排，列内每种一行 */
+        .owned-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-md);
+            align-items: start;
+        }
+        .owned-cols .mat-col-head {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .owned-cols .materials-grid {
+            grid-template-columns: 1fr;
+            gap: 6px;
+            margin-bottom: 0;
+        }
+
         /* 材料输入区域 */
         .materials-input {
             background-color: var(--bg-primary);
@@ -896,10 +914,16 @@
                         <span class="adt-hint">开启后，调高「当前等级」会自动从下方库存中扣掉消耗的材料（可撤销）</span>
                     </span>
                 </label>
-                <div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">⚔️ 神兵材料</div>
-                <div class="materials-grid" id="owned-materials-grid"></div>
-                <div style="font-size:13px;font-weight:600;color:#27ae60;margin-bottom:8px;">🟢 玉石材料</div>
-                <div class="materials-grid" id="owned-jade-grid"></div>
+                <div class="owned-cols">
+                    <div class="owned-col">
+                        <div class="mat-col-head" style="color:var(--text-secondary);">⚔️ 神兵材料</div>
+                        <div class="materials-grid" id="owned-materials-grid"></div>
+                    </div>
+                    <div class="owned-col">
+                        <div class="mat-col-head" style="color:#27ae60;">🟢 玉石材料</div>
+                        <div class="materials-grid" id="owned-jade-grid"></div>
+                    </div>
+                </div>
             </div>
 
             <!-- ② 材料售价与活动币 -->
