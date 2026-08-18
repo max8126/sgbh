@@ -354,13 +354,13 @@
             background-color: var(--bg-primary);
             border-radius: var(--radius-md);
             padding: var(--spacing-md);
-            margin-bottom: var(--spacing-xl);
+            margin-bottom: var(--spacing-md);
             box-shadow: var(--card-shadow);
         }
         .materials-input .section-title {
             font-size: var(--font-size-lg);
             font-weight: 600;
-            margin-bottom: var(--spacing-md);
+            margin-bottom: var(--spacing-sm);
             padding-bottom: var(--spacing-sm);
             border-bottom: 1px solid var(--border-color);
             color: #2c3e50;
@@ -371,26 +371,35 @@
 
         .materials-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: var(--spacing-md);
-            margin-bottom: var(--spacing-lg);
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            margin-bottom: var(--spacing-sm);
         }
 
+        /* 行内紧凑：标签在左、输入框在右，一行一项 */
         .material-item {
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            gap: 8px;
         }
 
         .material-item label {
-            font-size: var(--font-size-sm);
+            flex: 1;
+            min-width: 0;
+            font-size: var(--font-size-xs);
             color: var(--text-secondary);
-            margin-bottom: var(--spacing-xs);
             font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .material-item input {
-            padding: 10px 12px;
-            font-size: var(--font-size-md);
+            flex: 0 0 86px;
+            width: 86px;
+            padding: 6px 8px;
+            font-size: var(--font-size-sm);
+            text-align: right;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
             background-color: var(--bg-primary);
@@ -402,21 +411,25 @@
             border-color: var(--primary-color);
         }
 
-        /* 活动币输入框 */
+        /* 活动币输入框（行内紧凑） */
         .coin-input-row {
-            margin-top: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
         }
         .coin-input-row label {
-            display: block;
+            flex: 0 0 auto;
             font-size: var(--font-size-sm);
             color: var(--text-secondary);
-            margin-bottom: var(--spacing-xs);
             font-weight: 500;
         }
         .coin-input-row input {
-            width: 100%;
-            padding: 12px;
+            flex: 1;
+            min-width: 0;
+            padding: 8px 10px;
             font-size: var(--font-size-md);
+            text-align: right;
             border: 1px solid var(--border-color);
             border-radius: var(--radius-sm);
             background-color: var(--bg-primary);
@@ -433,16 +446,54 @@
         .package-settings {
             background-color: var(--bg-secondary);
             border-radius: var(--radius-sm);
-            padding: var(--spacing-md);
-            margin-top: var(--spacing-md);
+            padding: var(--spacing-sm) var(--spacing-md);
+            margin-top: var(--spacing-sm);
         }
 
         .package-settings h4 {
-            font-size: var(--font-size-md);
+            font-size: var(--font-size-sm);
             font-weight: 600;
-            margin-bottom: var(--spacing-sm);
+            margin-bottom: var(--spacing-xs);
             color: var(--text-primary);
         }
+
+        /* 礼包单行：材料名 + 每包 + 单价 */
+        .pkg-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .pkg-row:last-child { margin-bottom: 0; }
+        .pkg-name {
+            flex: 1;
+            min-width: 0;
+            font-size: var(--font-size-xs);
+            font-weight: 500;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .pkg-field {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: var(--font-size-xs);
+            color: var(--text-tertiary);
+        }
+        .pkg-field input {
+            width: 66px;
+            padding: 6px 8px;
+            font-size: var(--font-size-sm);
+            text-align: right;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .pkg-field input:focus { outline: none; border-color: var(--primary-color); }
 
         /* 实时汇总条（移动端固定条；桌面端隐藏） */
         .totals-bar {
@@ -1078,25 +1129,20 @@
     function buildMaterialInputs() {
         document.getElementById('owned-materials-grid').innerHTML = MATERIALS.map(m => `
             <div class="material-item">
-                <label for="owned-${m.key}">已拥有${m.icon}${m.name}</label>
+                <label for="owned-${m.key}">${m.icon} ${m.name}</label>
                 <input type="number" id="owned-${m.key}" min="0" value="0">
             </div>`).join('');
         document.getElementById('owned-jade-grid').innerHTML = JADE_MATERIALS.map(m => `
             <div class="material-item">
-                <label for="jade-owned-${m.key}">已拥有${m.icon}${m.name}</label>
+                <label for="jade-owned-${m.key}">${m.icon} ${m.name}</label>
                 <input type="number" id="jade-owned-${m.key}" min="0" value="0">
             </div>`).join('');
 
         const pkgRow = m => `
-            <div class="materials-grid">
-                <div class="material-item">
-                    <label for="pkgsize-${m.key}">${m.icon} ${m.name}礼包</label>
-                    <input type="number" id="pkgsize-${m.key}" min="1" value="${m.defaultPkgSize}">
-                </div>
-                <div class="material-item">
-                    <label for="pkgprice-${m.key}">礼包价格</label>
-                    <input type="number" id="pkgprice-${m.key}" min="0" value="${m.defaultPkgPrice}">
-                </div>
+            <div class="pkg-row">
+                <span class="pkg-name">${m.icon} ${m.name}</span>
+                <label class="pkg-field">每包<input type="number" id="pkgsize-${m.key}" min="1" value="${m.defaultPkgSize}"></label>
+                <label class="pkg-field">单价<input type="number" id="pkgprice-${m.key}" min="0" value="${m.defaultPkgPrice}"></label>
             </div>`;
         const subLabel = (txt, color) => `<div style="font-size:13px;font-weight:600;color:${color};margin:4px 0 8px;">${txt}</div>`;
         document.getElementById('package-settings-container').innerHTML =
