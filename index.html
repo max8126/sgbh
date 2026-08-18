@@ -227,7 +227,7 @@
         /* 修正箭头：垂直居中对齐，不再靠下 */
         .select-wrapper {
             width: 100% !important;
-            height: 44px !important;
+            height: 38px !important;
             overflow: hidden !important;
             position: relative;
         }
@@ -305,6 +305,49 @@
                 width: 200px !important;
             }
         }
+
+        /* ===== 紧凑单位行：名称 + 神兵行 + 玉石行，共用「当前 / 目标」两列 ===== */
+        .unit-row {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .unit-row:last-child { border-bottom: none; padding-bottom: 0; }
+        .ur-name {
+            font-size: var(--font-size-md);
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+        .ur-grid {
+            display: grid;
+            grid-template-columns: 84px minmax(0, 180px) minmax(0, 180px);
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .ur-grid:last-child { margin-bottom: 0; }
+        .ur-head { margin: 0 0 6px; }
+        .ur-head .ur-col {
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding-left: 4px;
+        }
+        .ur-note {
+            font-size: var(--font-size-xs);
+            color: #27ae60;
+            margin: 2px 0 8px;
+            line-height: 1.4;
+        }
+        .ur-tag {
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .ur-tag-weapon { color: var(--text-secondary); }
+        .ur-tag-jade { color: #27ae60; }
 
         /* 材料输入区域 */
         .materials-input {
@@ -1003,42 +1046,17 @@
         document.getElementById('characters-container').innerHTML = GROUPS.map((g, i) => {
             const rows = UNITS.filter(u => u.group === g.key).map(u => {
                 return `
-            <div class="character-row">
-                <div class="weapon-line">
-                <div class="character-row-header">
-                    <div class="character-name">${u.name}</div>
+            <div class="unit-row">
+                <div class="ur-name">${u.name}</div>
+                <div class="ur-grid">
+                    <span class="ur-tag ur-tag-weapon">⚔️ 神兵</span>
+                    <div class="select-wrapper"><select id="current-level-${u.id}" class="current-level-select"></select></div>
+                    <div class="select-wrapper"><select id="target-level-${u.id}" class="target-level-select" disabled></select></div>
                 </div>
-                <div class="level-selectors">
-                    <div class="level-selector">
-                        <label for="current-level-${u.id}">当前等级</label>
-                        <div class="select-wrapper">
-                            <select id="current-level-${u.id}" class="current-level-select"></select>
-                        </div>
-                    </div>
-                    <div class="level-selector">
-                        <label for="target-level-${u.id}">目标等级</label>
-                        <div class="select-wrapper">
-                            <select id="target-level-${u.id}" class="target-level-select" disabled></select>
-                        </div>
-                    </div>
-                </div>
-                </div>
-                <div style="margin-top:10px;margin-left:4px;padding-left:14px;border-left:3px solid #2ecc71;">
-                    <div style="font-size:13px;font-weight:600;color:#27ae60;margin-bottom:8px;">↳ 🟢 玉石 · ${JADE_SLOTS_PER_UNIT} 颗同级（1–${JADE_MAX_LEVEL}阶）</div>
-                    <div class="level-selectors">
-                        <div class="level-selector">
-                            <label for="jade-current-${u.id}">玉石当前</label>
-                            <div class="select-wrapper">
-                                <select id="jade-current-${u.id}" class="jade-current-select"></select>
-                            </div>
-                        </div>
-                        <div class="level-selector">
-                            <label for="jade-target-${u.id}">玉石目标</label>
-                            <div class="select-wrapper">
-                                <select id="jade-target-${u.id}" class="jade-target-select" disabled></select>
-                            </div>
-                        </div>
-                    </div>
+                <div class="ur-grid">
+                    <span class="ur-tag ur-tag-jade">🟢 玉石×${JADE_SLOTS_PER_UNIT}</span>
+                    <div class="select-wrapper"><select id="jade-current-${u.id}" class="jade-current-select"></select></div>
+                    <div class="select-wrapper"><select id="jade-target-${u.id}" class="jade-target-select" disabled></select></div>
                 </div>
             </div>`;
             }).join('');
@@ -1047,6 +1065,8 @@
             <div class="class-group-header ${g.key}">
                 <h2><span class="group-icon">${g.icon}</span>${g.name}</h2>
             </div>
+            <div class="ur-note">🟢 玉石＝每件 ${JADE_SLOTS_PER_UNIT} 颗同级，选 1 颗自动 ×${JADE_SLOTS_PER_UNIT} 计算（1–${JADE_MAX_LEVEL} 阶）</div>
+            <div class="ur-grid ur-head"><span></span><span class="ur-col">当前</span><span class="ur-col">目标</span></div>
             ${rows}
         </div>`;
         }).join('');
